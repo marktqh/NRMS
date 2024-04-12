@@ -17,6 +17,7 @@ Model = getattr(importlib.import_module("model.NRMS"), "NRMS")
 config = getattr(importlib.import_module('config'), "NRMSConfig")
 
 
+#device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 

@@ -18,7 +18,7 @@ class BaseConfig():
     negative_sampling_ratio = 2  # K
     dropout_probability = 0.2
     # Modify the following by the output of `src/dataprocess.py`
-    num_words = 1 + 70975
+    num_words = 1 + 70972
     num_categories = 1 + 274
     num_entities = 1 + 12957
     num_users = 1 + 50000
@@ -33,4 +33,9 @@ class BaseConfig():
 class NRMSConfig(BaseConfig):
     dataset_attributes = {"news": ['title'], "record": []}
     # For multi-head self-attention
-    num_attention_heads = 15
+    num_attention_heads = 12 # originally 15
+    use_bert = True
+    bert_model = "distilbert/distilbert-base-uncased"
+
+    if use_bert:
+        word_embedding_dim = 768
