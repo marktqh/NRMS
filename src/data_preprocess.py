@@ -10,6 +10,7 @@ from nltk.tokenize import word_tokenize
 import numpy as np
 import csv
 import importlib
+import multiprocessing
 
 
 config = getattr(importlib.import_module('config'), "NRMSConfig")
@@ -33,22 +34,55 @@ def parse_behaviors(source, target, user2int_path):
     behaviors.impressions = behaviors.impressions.str.split()
 
     user2int = {}
+    user2int_new = {}
+    old_user_index = []
+    new_user_index = []
+    index = 0
+    # user_int = 1
+    # get the index of new users
     for row in behaviors.itertuples(index=False):
-        if row.user not in user2int:
-            user2int[row.user] = len(user2int) + 1
+        if row.clicked_news != ' ':
+            if row.user not in user2int:
+                user2int[row.user] = len(user2int) + 1
+            old_user_index.append(index)
+        else:
+            if row.user not in user2int_new:
+                    user2int_new[row.user] = len(user2int_new) + 1
+            new_user_index.append(index)
+        index += 1
+    index_shift = len(user2int)
+    for user in user2int_new.keys():
+        user2int_new[user] += index_shift
 
     pd.DataFrame(user2int.items(), columns=['user',
                                             'int']).to_csv(user2int_path,
+                                                           sep='\t',
+                                                           index=False)
+    pd.DataFrame(user2int_new.items(), columns=['user',
+                                            'int']).to_csv(user2int_path.replace('.tsv','_new.tsv'),
                                                            sep='\t',
                                                            index=False)
     print(
         f'Please modify `num_users` in `src/config.py` into 1 + {len(user2int)}'
     )
 
-    for row in behaviors.itertuples():
-        behaviors.at[row.Index, 'user'] = user2int[row.user]
+    # remove new users
+    print('remove new users')
+    behaviors = behaviors.iloc[old_user_index]
 
-    for row in tqdm(behaviors.itertuples(), desc="Balancing data"):
+    # for row in behaviors.itertuples():
+    #     behaviors.at[row.Index, 'user'] = user2int[row.user]
+
+    # def get_userInt(row):
+    #     return user2int[row.user]    
+
+    print('add user index as user_id')
+    # for i in tqdm(range(len(behaviors))):
+    #     behaviors.at[i, 'user'] = user2int[behaviors.iloc[i].user]
+    behaviors['user'] = behaviors['user'].apply(lambda x: user2int[x])
+    
+    print('begin impression ingestion')
+    def get_impression_pairs(row):
         positive = iter([x for x in row.impressions if x.endswith('1')])
         negative = [x for x in row.impressions if x.endswith('0')]
         random.shuffle(negative)
@@ -62,8 +96,25 @@ def parse_behaviors(source, target, user2int_path):
                 pairs.append(pair)
         except StopIteration:
             pass
-        behaviors.at[row.Index, 'impressions'] = pairs
-
+        return pairs
+    
+    # for row in tqdm(behaviors.itertuples(), desc="Balancing data"):
+    #     positive = iter([x for x in row.impressions if x.endswith('1')])
+    #     negative = [x for x in row.impressions if x.endswith('0')]
+    #     random.shuffle(negative)
+    #     negative = iter(negative)
+    #     pairs = []
+    #     try:
+    #         while True:
+    #             pair = [next(positive)]
+    #             for _ in range(config.negative_sampling_ratio):
+    #                 pair.append(next(negative))
+    #             pairs.append(pair)
+    #     except StopIteration:
+    #         pass
+    #     behaviors.at[row.Index, 'impressions'] = pairs
+    behaviors['impressions'] = behaviors.apply(lambda x: get_impression_pairs(x), axis=1)
+    
     behaviors = behaviors.explode('impressions').dropna(
         subset=["impressions"]).reset_index(drop=True)
     behaviors[['candidate_news', 'clicked']] = pd.DataFrame(
@@ -302,9 +353,13 @@ def transform_entity_embedding(source, target, entity2int_path):
 
 
 if __name__ == '__main__':
-    train_dir = './data/train'
-    val_dir = './data/val'
-    test_dir = './data/test'
+    # train_dir = './data/train'
+    # val_dir = './data/val'
+    # test_dir = './data/test'
+    
+    train_dir = '..\\..\data\\train'
+    val_dir = '..\\..\\data\\val'
+    test_dir = '..\\..\\data\\test'
 
     print('Process data for training')
 
@@ -323,7 +378,7 @@ if __name__ == '__main__':
 
     print('Generate word embedding')
     generate_word_embedding(
-        f'./data/glove/glove.840B.{config.word_embedding_dim}d.txt',
+        f'../../data/glove/glove.840B.{config.word_embedding_dim}d.txt',
         path.join(train_dir, 'pretrained_word_embedding.npy'),
         path.join(train_dir, 'word2int.tsv'))
 
