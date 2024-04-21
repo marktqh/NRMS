@@ -7,6 +7,7 @@ from transformers import AutoTokenizer, AutoModel
 import pandas as pd
 import os
 
+# device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
@@ -15,14 +16,8 @@ class NewsEncoder(torch.nn.Module):
         super(NewsEncoder, self).__init__()
         self.config = config
         if self.config.use_bert:
-            path = os.path.join(os.getcwd(), "data/train/word2int.tsv")
-            word2int_df = pd.read_table(path)
-            # Convert DataFrame to dictionary for faster lookup
-            self.int2word = word2int_df.set_index('int')['word'].to_dict()
             self.BERTtokenizer = AutoTokenizer.from_pretrained(config.bert_model)
             self.word_embedding = AutoModel.from_pretrained(config.bert_model).to(device)
-            # for param in self.word_embedding.parameters():
-            #     param.requires_grad = False
         elif pretrained_word_embedding is None:
             self.word_embedding = nn.Embedding(config.num_words,
                                                config.word_embedding_dim,
@@ -48,19 +43,11 @@ class NewsEncoder(torch.nn.Module):
         """
         # batch_size, num_words_title, word_embedding_dim
         if self.config.use_bert:
-            titles = self.recover_words(news["title"])
             with torch.no_grad():
-                try:
-                    tokenized_titles = self.BERTtokenizer(titles, 
-                                                        padding=True, 
-                                                        return_tensors='pt',
-                                                        is_split_into_words=True).to(device)
-                    embedding = self.word_embedding(**tokenized_titles).last_hidden_state.to(device)
-                except Exception as e:
-                    print(f"An error occurred during tokenization: {e}")
-                    print("Titles:", titles)
-                    raise
-
+                tokenized_titles = self.BERTtokenizer(news["title"], padding=True, 
+                                                    return_tensors='pt', 
+                                                    is_split_into_words=True).to(device)
+                embedding = self.word_embedding(**tokenized_titles).last_hidden_state.to(device)
         else:
             embedding = self.word_embedding(news["title"].to(device))
 
@@ -75,7 +62,3 @@ class NewsEncoder(torch.nn.Module):
         # batch_size, word_embedding_dim
         final_news_vector = self.additive_attention(multihead_news_vector)
         return final_news_vector
-    
-
-    def recover_words(self, title: torch.tensor):
-        return [[str(self.int2word.get(int(idx), " ")) for idx in title_batch] for title_batch in title]

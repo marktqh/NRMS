@@ -17,7 +17,7 @@ Model = getattr(importlib.import_module("model.NRMS"), "NRMS")
 config = getattr(importlib.import_module('config'), "NRMSConfig")
 
 
-#device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+# device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
@@ -79,9 +79,13 @@ def train():
     model = Model(config, pretrained_word_embedding).to(device)
 
     print(model)
-
-    dataset = BaseDataset('data/train/behaviors_parsed.tsv',
-                          'data/train/news_parsed.tsv')
+    
+    if config.use_bert:
+        dataset = BaseDataset('data/train/behaviors_parsed.tsv',
+                          'data/train/news_parsed_bert.tsv')
+    else:
+        dataset = BaseDataset('data/train/behaviors_parsed.tsv',
+                            'data/train/news_parsed.tsv')
 
     print(f"Load training dataset with size {len(dataset)}.")
 
