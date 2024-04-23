@@ -36,32 +36,20 @@ def parse_behaviors(source, target, user2int_path):
     behaviors.impressions = behaviors.impressions.str.split()
 
     user2int = {}
-    user2int_new = {}
-    old_user_index = []
-    new_user_index = []
-    index = 0
+    #user2int_new = {}
+    #user_index = []
+    #new_user_index = []
+    #index = 0
     # user_int = 1
     # get the index of new users
     for row in behaviors.itertuples(index=False):
-        if row.clicked_news != ' ':
-            if row.user not in user2int:
+        if row.user not in user2int:
                 user2int[row.user] = len(user2int) + 1
-            old_user_index.append(index)
-        else:
-            if row.user not in user2int_new:
-                    user2int_new[row.user] = len(user2int_new) + 1
-            new_user_index.append(index)
-        index += 1
-    index_shift = len(user2int)
-    for user in user2int_new.keys():
-        user2int_new[user] += index_shift
+        # user_index.append(index)
+        # index += 1
 
     pd.DataFrame(user2int.items(), columns=['user',
                                             'int']).to_csv(user2int_path,
-                                                           sep='\t',
-                                                           index=False)
-    pd.DataFrame(user2int_new.items(), columns=['user',
-                                            'int']).to_csv(user2int_path.replace('.tsv','_new.tsv'),
                                                            sep='\t',
                                                            index=False)
     print(
