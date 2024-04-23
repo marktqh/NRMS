@@ -6,6 +6,8 @@ from tqdm import tqdm
 from os import path
 from pathlib import Path
 import random
+import nltk
+nltk.download('punkt')
 from nltk.tokenize import word_tokenize
 import numpy as np
 import csv
@@ -67,8 +69,8 @@ def parse_behaviors(source, target, user2int_path):
     )
 
     # remove new users
-    print('remove new users')
-    behaviors = behaviors.iloc[old_user_index]
+    # print('remove new users')
+    # behaviors = behaviors.iloc[old_user_index]
 
     # for row in behaviors.itertuples():
     #     behaviors.at[row.Index, 'user'] = user2int[row.user]
