@@ -105,7 +105,10 @@ def train():
     step = 0
     early_stopping = EarlyStopping()
 
-    checkpoint_dir = os.path.join('./checkpoint', "NRMS")
+    if config.use_bert:
+        checkpoint_dir = os.path.join('./checkpoint', "NRMS-BERT")
+    else:
+        checkpoint_dir = os.path.join('./checkpoint', "NRMS")
     Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
 
     checkpoint_path = latest_checkpoint(checkpoint_dir)

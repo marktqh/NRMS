@@ -167,7 +167,7 @@ def parse_news(source, target, category2int_path, word2int_path,
         try:
             if bert:
                 for i, w in enumerate(word_tokenize(row.title.lower())):
-                    new_row[3][i] = w
+                    new_row[3][i] = str(w)
             else:
                 for i, w in enumerate(word_tokenize(row.title.lower())):
                     if w in word2int:

@@ -177,7 +177,11 @@ def evaluate(model, directory, num_workers, max_count=sys.maxsize):
         nDCG@5
         nDCG@10
     """
-    news_dataset = NewsDataset(path.join(directory, 'news_parsed.tsv'))
+
+    if config.use_bert:
+        news_dataset = NewsDataset(path.join(directory, 'news_parsed_bert.tsv'))
+    else:
+        news_dataset = NewsDataset(path.join(directory, 'news_parsed.tsv'))
     news_dataloader = DataLoader(news_dataset,
                                  batch_size=config.batch_size * 16,
                                  shuffle=False,
@@ -269,7 +273,10 @@ if __name__ == '__main__':
     # since it will be loaded from checkpoint later
     model = Model(config).to(device)
     from train import latest_checkpoint  # Avoid circular imports
-    checkpoint_path = latest_checkpoint(path.join('./checkpoint', "NRMS"))
+    if config.use_bert:
+        checkpoint_path = latest_checkpoint(path.join('./checkpoint', "NRMS-BERT"))
+    else:
+        checkpoint_path = latest_checkpoint(path.join('./checkpoint', "NRMS"))
     if checkpoint_path is None:
         print('No checkpoint file found!')
         exit()
