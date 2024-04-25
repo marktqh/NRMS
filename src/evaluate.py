@@ -9,6 +9,8 @@ import pandas as pd
 from ast import literal_eval
 import importlib
 from multiprocessing import Pool
+from collections import defaultdict
+
 
 
 Model = getattr(importlib.import_module("model.NRMS"), "NRMS")
@@ -61,11 +63,12 @@ class NewsDataset(Dataset):
                 ])
             })
         self.news2dict = self.news_parsed.to_dict('index')
-        for key1 in self.news2dict.keys():
-            for key2 in self.news2dict[key1].keys():
-                if type(self.news2dict[key1][key2]) != str:
-                    self.news2dict[key1][key2] = torch.tensor(
-                        self.news2dict[key1][key2])
+        if not config.use_bert:
+            for key1 in self.news2dict.keys():
+                for key2 in self.news2dict[key1].keys():
+                    if type(self.news2dict[key1][key2]) != str:
+                        self.news2dict[key1][key2] = torch.tensor(
+                            self.news2dict[key1][key2])
 
     def __len__(self):
         return len(self.news_parsed)
@@ -177,7 +180,6 @@ def evaluate(model, directory, num_workers, max_count=sys.maxsize):
         nDCG@5
         nDCG@10
     """
-
     if config.use_bert:
         news_dataset = NewsDataset(path.join(directory, 'news_parsed_bert.tsv'))
     else:
@@ -189,18 +191,25 @@ def evaluate(model, directory, num_workers, max_count=sys.maxsize):
                                  drop_last=False,
                                  pin_memory=True)
 
-    news2vector = {}
+    # news2vector = {}
+    vector_size = 768
+    default_vector = torch.zeros(vector_size)
+    news2vector = defaultdict(lambda: default_vector)
+
     for minibatch in tqdm(news_dataloader,
                           desc="Calculating vectors for news"):
         news_ids = minibatch["id"]
-        if any(id not in news2vector for id in news_ids):
-            news_vector = model.get_news_vector(minibatch)
-            for id, vector in zip(news_ids, news_vector):
-                if id not in news2vector:
-                    news2vector[id] = vector
+        news_vector = model.get_news_vector(minibatch).to(device)
+        for id, vector in zip(news_ids, news_vector):
+            news2vector[id] = vector
+        # if any(id not in news2vector for id in news_ids):
+        #     news_vector = model.get_news_vector(minibatch)
+        #     for id, vector in zip(news_ids, news_vector):
+        #         if id not in news2vector:
+        #             news2vector[id] = vector
 
-    news2vector['PADDED_NEWS'] = torch.zeros(
-        list(news2vector.values())[0].size())
+    news2vector['PADDED_NEWS'] = torch.zeros(vector_size).to(device)
+    # print('The vector size is:',list(news2vector.values())[0].size())
 
     user_dataset = UserDataset(path.join(directory, 'behaviors.tsv'),
                                'data/train/user2int.tsv')
@@ -221,7 +230,7 @@ def evaluate(model, directory, num_workers, max_count=sys.maxsize):
                             dim=0) for news_list in minibatch["clicked_news"]
             ],
                                               dim=0).transpose(0, 1)
-            user_vector = model.get_user_vector(clicked_news_vector)
+            user_vector = model.get_user_vector(clicked_news_vector).to(device)
             for user, vector in zip(user_strings, user_vector):
                 if user not in user2vector:
                     user2vector[user] = vector
@@ -243,11 +252,11 @@ def evaluate(model, directory, num_workers, max_count=sys.maxsize):
             break
 
         candidate_news_vector = torch.stack([
-            news2vector[news[0].split('-')[0]]
+            news2vector[news[0].split('-')[0]].to(device)
             for news in minibatch['impressions']
         ],
-                                            dim=0)
-        user_vector = user2vector[minibatch['clicked_news_string'][0]]
+                                            dim=0).to(device)
+        user_vector = user2vector[minibatch['clicked_news_string'][0]].to(device)
         click_probability = model.get_prediction(candidate_news_vector,
                                                  user_vector)
 
@@ -273,10 +282,7 @@ if __name__ == '__main__':
     # since it will be loaded from checkpoint later
     model = Model(config).to(device)
     from train import latest_checkpoint  # Avoid circular imports
-    if config.use_bert:
-        checkpoint_path = latest_checkpoint(path.join('./checkpoint', "NRMS-BERT"))
-    else:
-        checkpoint_path = latest_checkpoint(path.join('./checkpoint', "NRMS"))
+    checkpoint_path = latest_checkpoint(path.join('./checkpoint', "NRMS"))
     if checkpoint_path is None:
         print('No checkpoint file found!')
         exit()
