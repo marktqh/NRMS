@@ -11,7 +11,7 @@ import importlib
 from multiprocessing import Pool
 from collections import defaultdict
 
-
+TOKENIZERS_PARALLELISM=False
 
 Model = getattr(importlib.import_module("model.NRMS"), "NRMS")
 config = getattr(importlib.import_module('config'), "NRMSConfig")
