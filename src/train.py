@@ -191,7 +191,7 @@ def train():
                             step,
                             'early_stop_value':
                             -val_auc
-                        }, f"./checkpoint/NRMS/ckpt-{step}.pth")
+                        }, f"./checkpoint/NRMS/ckpt-{step}.pth" if not config.use_bert else f"./checkpoint/NRMS-BERT/ckpt-{step}.pth")
                 except OSError as error:
                     print(f"OS error: {error}")
 
