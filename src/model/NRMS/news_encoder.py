@@ -46,7 +46,10 @@ class NewsEncoder(torch.nn.Module):
             with torch.no_grad():
                 tokenized_titles = self.BERTtokenizer(news["title"], padding=True, 
                                                     return_tensors='pt', 
-                                                    is_split_into_words=True).to(device)
+                                                    is_split_into_words=True, 
+                                                    truncation=True, 
+                                                    max_length=50, 
+                                                    add_special_tokens = True).to(device)
                 embedding = self.word_embedding(**tokenized_titles).last_hidden_state.to(device)
         else:
             embedding = self.word_embedding(news["title"].to(device))
