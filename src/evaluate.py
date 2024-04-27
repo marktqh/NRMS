@@ -9,6 +9,7 @@ import pandas as pd
 from ast import literal_eval
 import importlib
 from multiprocessing import Pool
+import time
 
 
 Model = getattr(importlib.import_module("model.NRMS"), "NRMS")
@@ -199,7 +200,7 @@ def evaluate(model, directory, num_workers, max_count=sys.maxsize):
         list(news2vector.values())[0].size())
 
     user_dataset = UserDataset(path.join(directory, 'behaviors.tsv'),
-                               'data/train/user2int.tsv')
+                               '../../data/train/user2int.tsv')
     user_dataloader = DataLoader(user_dataset,
                                  batch_size=config.batch_size * 16,
                                  shuffle=False,
@@ -263,6 +264,7 @@ def evaluate(model, directory, num_workers, max_count=sys.maxsize):
 
 
 if __name__ == '__main__':
+    begin = time.time()
     print('Using device:', device)
     print('Evaluating NRMS')
     # Don't need to load pretrained word/entity/context embedding
@@ -277,8 +279,9 @@ if __name__ == '__main__':
     checkpoint = torch.load(checkpoint_path)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
-    auc, mrr, ndcg5, ndcg10 = evaluate(model, './data/test',
+    auc, mrr, ndcg5, ndcg10 = evaluate(model, '../../data/val',
                                        config.num_workers)
     print(
         f'AUC: {auc:.4f}\nMRR: {mrr:.4f}\nnDCG@5: {ndcg5:.4f}\nnDCG@10: {ndcg10:.4f}'
     )
+    print(f'Time of execution: {time.time()-begin} seconds.')

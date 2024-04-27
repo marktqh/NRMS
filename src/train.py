@@ -59,11 +59,13 @@ def latest_checkpoint(directory):
     return os.path.join(directory,
                         all_checkpoints[max(all_checkpoints.keys())])
 
-
 def train():
+    timestamp = datetime.datetime.now().replace(microsecond=0).strftime("%Y-%m-%dT%H-%M-%S")
+    remark = f'-{os.environ["REMARK"]}' if 'REMARK' in os.environ else ''
+    path_temp = f".\\runs\\NRMS\\{timestamp}{remark}"
     writer = SummaryWriter(
-        log_dir=
-        f"./runs/NRMS/{datetime.datetime.now().replace(microsecond=0).isoformat()}{'-' + os.environ['REMARK'] if 'REMARK' in os.environ else ''}"
+        log_dir=path_temp
+        # f"./runs/NRMS/{datetime.datetime.now().replace(microsecond=0).isoformat()}{'-' + os.environ['REMARK'] if 'REMARK' in os.environ else ''}"
     )
 
     if not os.path.exists('checkpoint'):
@@ -71,7 +73,7 @@ def train():
 
     try:
         pretrained_word_embedding = torch.from_numpy(
-            np.load('./data/train/pretrained_word_embedding.npy')).float()
+            np.load('..\\..\\data\\train\\pretrained_word_embedding.npy')).float()
     except FileNotFoundError:
         pretrained_word_embedding = None
 
@@ -79,8 +81,8 @@ def train():
 
     print(model)
 
-    dataset = BaseDataset('data/train/behaviors_parsed.tsv',
-                          'data/train/news_parsed.tsv')
+    dataset = BaseDataset('..\\..\\data\\train\\behaviors_parsed.tsv',
+                          '..\\..\\data\\train\\news_parsed.tsv')
 
     print(f"Load training dataset with size {len(dataset)}.")
 
@@ -100,7 +102,7 @@ def train():
     step = 0
     early_stopping = EarlyStopping()
 
-    checkpoint_dir = os.path.join('./checkpoint', "NRMS")
+    checkpoint_dir = os.path.join('.\\checkpoint', "NRMS")
     Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
 
     checkpoint_path = latest_checkpoint(checkpoint_dir)
@@ -157,7 +159,7 @@ def train():
         if i % config.num_batches_validate == 0:
             model.eval()
             val_auc, val_mrr, val_ndcg5, val_ndcg10 = evaluate(
-                model, './data/val',
+                model, '..\\..\\data\\val',
                 config.num_workers, 200000)
             model.train()
             writer.add_scalar('Validation/AUC', val_auc, step)
@@ -183,7 +185,7 @@ def train():
                             step,
                             'early_stop_value':
                             -val_auc
-                        }, f"./checkpoint/NRMS/ckpt-{step}.pth")
+                        }, f".\\checkpoint\\NRMS\\ckpt-{step}.pth")
                 except OSError as error:
                     print(f"OS error: {error}")
 
@@ -198,6 +200,8 @@ def time_since(since):
 
 
 if __name__ == '__main__':
+    begin = time.time()
     print('Using device:', device)
     print('Training model NRMS')
     train()
+    print(f'Time of execution: {time.time()-begin} seconds.')
