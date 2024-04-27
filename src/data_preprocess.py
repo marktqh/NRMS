@@ -6,13 +6,10 @@ from tqdm import tqdm
 from os import path
 from pathlib import Path
 import random
-import nltk
-nltk.download('punkt')
 from nltk.tokenize import word_tokenize
 import numpy as np
 import csv
 import importlib
-import multiprocessing
 
 
 config = getattr(importlib.import_module('config'), "NRMSConfig")
@@ -36,17 +33,9 @@ def parse_behaviors(source, target, user2int_path):
     behaviors.impressions = behaviors.impressions.str.split()
 
     user2int = {}
-    #user2int_new = {}
-    #user_index = []
-    #new_user_index = []
-    #index = 0
-    # user_int = 1
-    # get the index of new users
     for row in behaviors.itertuples(index=False):
         if row.user not in user2int:
-                user2int[row.user] = len(user2int) + 1
-        # user_index.append(index)
-        # index += 1
+            user2int[row.user] = len(user2int) + 1
 
     pd.DataFrame(user2int.items(), columns=['user',
                                             'int']).to_csv(user2int_path,
@@ -56,23 +45,10 @@ def parse_behaviors(source, target, user2int_path):
         f'Please modify `num_users` in `src/config.py` into 1 + {len(user2int)}'
     )
 
-    # remove new users
-    # print('remove new users')
-    # behaviors = behaviors.iloc[old_user_index]
+    for row in behaviors.itertuples():
+        behaviors.at[row.Index, 'user'] = user2int[row.user]
 
-    # for row in behaviors.itertuples():
-    #     behaviors.at[row.Index, 'user'] = user2int[row.user]
-
-    # def get_userInt(row):
-    #     return user2int[row.user]    
-
-    print('add user index as user_id')
-    # for i in tqdm(range(len(behaviors))):
-    #     behaviors.at[i, 'user'] = user2int[behaviors.iloc[i].user]
-    behaviors['user'] = behaviors['user'].apply(lambda x: user2int[x])
-    
-    print('begin impression ingestion')
-    def get_impression_pairs(row):
+    for row in tqdm(behaviors.itertuples(), desc="Balancing data"):
         positive = iter([x for x in row.impressions if x.endswith('1')])
         negative = [x for x in row.impressions if x.endswith('0')]
         random.shuffle(negative)
@@ -86,25 +62,8 @@ def parse_behaviors(source, target, user2int_path):
                 pairs.append(pair)
         except StopIteration:
             pass
-        return pairs
-    
-    # for row in tqdm(behaviors.itertuples(), desc="Balancing data"):
-    #     positive = iter([x for x in row.impressions if x.endswith('1')])
-    #     negative = [x for x in row.impressions if x.endswith('0')]
-    #     random.shuffle(negative)
-    #     negative = iter(negative)
-    #     pairs = []
-    #     try:
-    #         while True:
-    #             pair = [next(positive)]
-    #             for _ in range(config.negative_sampling_ratio):
-    #                 pair.append(next(negative))
-    #             pairs.append(pair)
-    #     except StopIteration:
-    #         pass
-    #     behaviors.at[row.Index, 'impressions'] = pairs
-    behaviors['impressions'] = behaviors.apply(lambda x: get_impression_pairs(x), axis=1)
-    
+        behaviors.at[row.Index, 'impressions'] = pairs
+
     behaviors = behaviors.explode('impressions').dropna(
         subset=["impressions"]).reset_index(drop=True)
     behaviors[['candidate_news', 'clicked']] = pd.DataFrame(
@@ -143,13 +102,13 @@ def parse_news(source, target, category2int_path, word2int_path,
     news.abstract_entities.fillna('[]', inplace=True)
     news.fillna(' ', inplace=True)
 
-    def parse_row(row, bert=False):
+    def parse_row(row):
         new_row = [
             row.id,
             category2int[row.category] if row.category in category2int else 0,
             category2int[row.subcategory]
             if row.subcategory in category2int else 0,
-            [0] * config.num_words_title if not bert else [' '] * config.num_words_title, [0] * config.num_words_abstract,
+            [0] * config.num_words_title, [0] * config.num_words_abstract,
             [0] * config.num_words_title, [0] * config.num_words_abstract
         ]
 
@@ -165,15 +124,11 @@ def parse_news(source, target, category2int_path, word2int_path,
                     local_entity_map[x] = entity2int[e['WikidataId']]
 
         try:
-            if bert:
-                for i, w in enumerate(word_tokenize(row.title.lower())):
-                    new_row[3][i] = str(w)
-            else:
-                for i, w in enumerate(word_tokenize(row.title.lower())):
-                    if w in word2int:
-                        new_row[3][i] = word2int[w]
-                        if w in local_entity_map:
-                            new_row[5][i] = local_entity_map[w]
+            for i, w in enumerate(word_tokenize(row.title.lower())):
+                if w in word2int:
+                    new_row[3][i] = word2int[w]
+                    if w in local_entity_map:
+                        new_row[5][i] = local_entity_map[w]
         except IndexError:
             pass
 
@@ -241,9 +196,7 @@ def parse_news(source, target, category2int_path, word2int_path,
                 entity2int[k] = len(entity2int) + 1
 
         parsed_news = news.swifter.apply(parse_row, axis=1)
-        parsed_news_bert = news.swifter.apply(lambda row: parse_row(row, bert=True), axis=1)
         parsed_news.to_csv(target, sep='\t', index=False)
-        parsed_news_bert.to_csv(target[:-4]+'_bert'+target[-4:], sep='\t', index=False)
 
         pd.DataFrame(category2int.items(),
                      columns=['category', 'int']).to_csv(category2int_path,
@@ -277,9 +230,7 @@ def parse_news(source, target, category2int_path, word2int_path,
         entity2int = dict(pd.read_table(entity2int_path).values.tolist())
 
         parsed_news = news.swifter.apply(parse_row, axis=1)
-        parsed_news_bert = news.swifter.apply(lambda row: parse_row(row, bert=True), axis=1)
         parsed_news.to_csv(target, sep='\t', index=False)
-        parsed_news_bert.to_csv(target[:-4]+'_bert'+target[-4:], sep='\t', index=False)
 
     else:
         print('Wrong mode!')
@@ -354,10 +305,6 @@ if __name__ == '__main__':
     train_dir = './data/train'
     val_dir = './data/val'
     test_dir = './data/test'
-    
-    # train_dir = '..\\..\data\\train'
-    # val_dir = '..\\..\\data\\val'
-    # test_dir = '..\\..\\data\\test'
 
     print('Process data for training')
 
@@ -376,7 +323,7 @@ if __name__ == '__main__':
 
     print('Generate word embedding')
     generate_word_embedding(
-        f'./data/glove/glove.840B.300d.txt', # originally f'./data/glove/glove.840B.{config.word_embedding_dim}d.txt'
+        f'./data/glove/glove.840B.{config.word_embedding_dim}d.txt',
         path.join(train_dir, 'pretrained_word_embedding.npy'),
         path.join(train_dir, 'word2int.tsv'))
 
