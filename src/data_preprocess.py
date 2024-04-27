@@ -11,7 +11,8 @@ import numpy as np
 import csv
 import importlib
 import multiprocessing
-
+import time
+import os
 
 config = getattr(importlib.import_module('config'), "NRMSConfig")
 
@@ -34,41 +35,18 @@ def parse_behaviors(source, target, user2int_path):
     behaviors.impressions = behaviors.impressions.str.split()
 
     user2int = {}
-    user2int_new = {}
-    old_user_index = []
-    new_user_index = []
-    index = 0
-    # user_int = 1
-    # get the index of new users
     for row in behaviors.itertuples(index=False):
-        if row.clicked_news != ' ':
-            if row.user not in user2int:
-                user2int[row.user] = len(user2int) + 1
-            old_user_index.append(index)
-        else:
-            if row.user not in user2int_new:
-                    user2int_new[row.user] = len(user2int_new) + 1
-            new_user_index.append(index)
-        index += 1
-    index_shift = len(user2int)
-    for user in user2int_new.keys():
-        user2int_new[user] += index_shift
+        if row.user not in user2int:
+            user2int[row.user] = len(user2int) + 1
 
     pd.DataFrame(user2int.items(), columns=['user',
                                             'int']).to_csv(user2int_path,
                                                            sep='\t',
                                                            index=False)
-    pd.DataFrame(user2int_new.items(), columns=['user',
-                                            'int']).to_csv(user2int_path.replace('.tsv','_new.tsv'),
-                                                           sep='\t',
-                                                           index=False)
+
     print(
         f'Please modify `num_users` in `src/config.py` into 1 + {len(user2int)}'
     )
-
-    # remove new users
-    print('remove new users')
-    behaviors = behaviors.iloc[old_user_index]
 
     # for row in behaviors.itertuples():
     #     behaviors.at[row.Index, 'user'] = user2int[row.user]
@@ -356,10 +334,12 @@ if __name__ == '__main__':
     # train_dir = './data/train'
     # val_dir = './data/val'
     # test_dir = './data/test'
-    
-    train_dir = '..\\..\data\\train'
-    val_dir = '..\\..\\data\\val'
-    test_dir = '..\\..\\data\\test'
+
+    begin = time.time()
+    small = ''
+    train_dir = f'..\\..\\data{small}\\train'
+    val_dir = f'..\\..\\data{small}\\val'
+    test_dir = f'..\\..\\data{small}\\test'
 
     print('Process data for training')
 
@@ -398,12 +378,16 @@ if __name__ == '__main__':
                path.join(train_dir, 'entity2int.tsv'),
                mode='test')
 
-    print('\nProcess data for test')
+    
 
-    print('Parse news')
-    parse_news(path.join(test_dir, 'news.tsv'),
-               path.join(test_dir, 'news_parsed.tsv'),
-               path.join(train_dir, 'category2int.tsv'),
-               path.join(train_dir, 'word2int.tsv'),
-               path.join(train_dir, 'entity2int.tsv'),
-               mode='test')
+    if os.path.exists(test_dir):
+        print('\nProcess data for test')
+        print('Parse news')
+        parse_news(path.join(test_dir, 'news.tsv'),
+                path.join(test_dir, 'news_parsed.tsv'),
+                path.join(train_dir, 'category2int.tsv'),
+                path.join(train_dir, 'word2int.tsv'),
+                path.join(train_dir, 'entity2int.tsv'),
+                mode='test')
+    
+    print(f'Time of execution: {time.time()-begin} seconds.')
