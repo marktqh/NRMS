@@ -17,7 +17,7 @@ Model = getattr(importlib.import_module("model.NRMS"), "NRMS")
 config = getattr(importlib.import_module('config'), "NRMSConfig")
 
 
-# device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+#device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
@@ -79,13 +79,9 @@ def train():
     model = Model(config, pretrained_word_embedding).to(device)
 
     print(model)
-    
-    if config.use_bert:
-        dataset = BaseDataset('data/train/behaviors_parsed.tsv',
-                          'data/train/news_parsed_bert.tsv')
-    else:
-        dataset = BaseDataset('data/train/behaviors_parsed.tsv',
-                            'data/train/news_parsed.tsv')
+
+    dataset = BaseDataset('data/train/behaviors_parsed.tsv',
+                          'data/train/news_parsed.tsv')
 
     print(f"Load training dataset with size {len(dataset)}.")
 
@@ -105,10 +101,7 @@ def train():
     step = 0
     early_stopping = EarlyStopping()
 
-    if config.use_bert:
-        checkpoint_dir = os.path.join('./checkpoint', "NRMS-BERT")
-    else:
-        checkpoint_dir = os.path.join('./checkpoint', "NRMS")
+    checkpoint_dir = os.path.join('./checkpoint', "NRMS")
     Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
 
     checkpoint_path = latest_checkpoint(checkpoint_dir)
@@ -191,7 +184,7 @@ def train():
                             step,
                             'early_stop_value':
                             -val_auc
-                        }, f"./checkpoint/NRMS/ckpt-{step}.pth" if not config.use_bert else f"./checkpoint/NRMS-BERT/ckpt-{step}.pth")
+                        }, f"./checkpoint/NRMS/ckpt-{step}.pth")
                 except OSError as error:
                     print(f"OS error: {error}")
 
