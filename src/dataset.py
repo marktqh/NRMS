@@ -40,16 +40,13 @@ class BaseDataset(Dataset):
         padding_all = {
             'category': 0,
             'subcategory': 0,
-            'title': [0] * config.num_words_title if not config.use_bert else [' '] * config.num_words_title,
+            'title': [0] * config.num_words_title,
             'abstract': [0] * config.num_words_abstract,
             'title_entities': [0] * config.num_words_title,
             'abstract_entities': [0] * config.num_words_abstract
         }
         for key in padding_all.keys():
-            try:
-                padding_all[key] = torch.tensor(padding_all[key])
-            except:
-                pass
+            padding_all[key] = torch.tensor(padding_all[key])
 
         self.padding = {
             k: v
