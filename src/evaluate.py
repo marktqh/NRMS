@@ -9,9 +9,7 @@ import pandas as pd
 from ast import literal_eval
 import importlib
 from multiprocessing import Pool
-from collections import defaultdict
 
-TOKENIZERS_PARALLELISM=False
 
 Model = getattr(importlib.import_module("model.NRMS"), "NRMS")
 config = getattr(importlib.import_module('config'), "NRMSConfig")
@@ -63,12 +61,11 @@ class NewsDataset(Dataset):
                 ])
             })
         self.news2dict = self.news_parsed.to_dict('index')
-        if not config.use_bert:
-            for key1 in self.news2dict.keys():
-                for key2 in self.news2dict[key1].keys():
-                    if type(self.news2dict[key1][key2]) != str:
-                        self.news2dict[key1][key2] = torch.tensor(
-                            self.news2dict[key1][key2])
+        for key1 in self.news2dict.keys():
+            for key2 in self.news2dict[key1].keys():
+                if type(self.news2dict[key1][key2]) != str:
+                    self.news2dict[key1][key2] = torch.tensor(
+                        self.news2dict[key1][key2])
 
     def __len__(self):
         return len(self.news_parsed)
@@ -180,10 +177,7 @@ def evaluate(model, directory, num_workers, max_count=sys.maxsize):
         nDCG@5
         nDCG@10
     """
-    if config.use_bert:
-        news_dataset = NewsDataset(path.join(directory, 'news_parsed_bert.tsv'))
-    else:
-        news_dataset = NewsDataset(path.join(directory, 'news_parsed.tsv'))
+    news_dataset = NewsDataset(path.join(directory, 'news_parsed.tsv'))
     news_dataloader = DataLoader(news_dataset,
                                  batch_size=config.batch_size * 16,
                                  shuffle=False,
@@ -191,25 +185,18 @@ def evaluate(model, directory, num_workers, max_count=sys.maxsize):
                                  drop_last=False,
                                  pin_memory=True)
 
-    # news2vector = {}
-    vector_size = 768
-    default_vector = torch.zeros(vector_size)
-    news2vector = defaultdict(lambda: default_vector)
-
+    news2vector = {}
     for minibatch in tqdm(news_dataloader,
                           desc="Calculating vectors for news"):
         news_ids = minibatch["id"]
-        news_vector = model.get_news_vector(minibatch).to(device)
-        for id, vector in zip(news_ids, news_vector):
-            news2vector[id] = vector
-        # if any(id not in news2vector for id in news_ids):
-        #     news_vector = model.get_news_vector(minibatch)
-        #     for id, vector in zip(news_ids, news_vector):
-        #         if id not in news2vector:
-        #             news2vector[id] = vector
+        if any(id not in news2vector for id in news_ids):
+            news_vector = model.get_news_vector(minibatch)
+            for id, vector in zip(news_ids, news_vector):
+                if id not in news2vector:
+                    news2vector[id] = vector
 
-    news2vector['PADDED_NEWS'] = torch.zeros(vector_size).to(device)
-    # print('The vector size is:',list(news2vector.values())[0].size())
+    news2vector['PADDED_NEWS'] = torch.zeros(
+        list(news2vector.values())[0].size())
 
     user_dataset = UserDataset(path.join(directory, 'behaviors.tsv'),
                                'data/train/user2int.tsv')
@@ -230,7 +217,7 @@ def evaluate(model, directory, num_workers, max_count=sys.maxsize):
                             dim=0) for news_list in minibatch["clicked_news"]
             ],
                                               dim=0).transpose(0, 1)
-            user_vector = model.get_user_vector(clicked_news_vector).to(device)
+            user_vector = model.get_user_vector(clicked_news_vector)
             for user, vector in zip(user_strings, user_vector):
                 if user not in user2vector:
                     user2vector[user] = vector
@@ -252,11 +239,11 @@ def evaluate(model, directory, num_workers, max_count=sys.maxsize):
             break
 
         candidate_news_vector = torch.stack([
-            news2vector[news[0].split('-')[0]].to(device)
+            news2vector[news[0].split('-')[0]]
             for news in minibatch['impressions']
         ],
-                                            dim=0).to(device)
-        user_vector = user2vector[minibatch['clicked_news_string'][0]].to(device)
+                                            dim=0)
+        user_vector = user2vector[minibatch['clicked_news_string'][0]]
         click_probability = model.get_prediction(candidate_news_vector,
                                                  user_vector)
 
