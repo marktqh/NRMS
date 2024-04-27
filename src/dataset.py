@@ -33,11 +33,10 @@ class BaseDataset(Dataset):
             })
         self.news_id2int = {x: i for i, x in enumerate(self.news_parsed.index)}
         self.news2dict = self.news_parsed.to_dict('index')
-        if not config.use_bert:
-            for key1 in self.news2dict.keys():
-                for key2 in self.news2dict[key1].keys():
-                    self.news2dict[key1][key2] = torch.tensor(
-                        self.news2dict[key1][key2])
+        for key1 in self.news2dict.keys():
+            for key2 in self.news2dict[key1].keys():
+                self.news2dict[key1][key2] = torch.tensor(
+                    self.news2dict[key1][key2])
         padding_all = {
             'category': 0,
             'subcategory': 0,
